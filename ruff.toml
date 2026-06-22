@@ -1,0 +1,2 @@
+# Keep the snippets compact: one-liners up to 120 cols stay on one line.
+line-length = 120
