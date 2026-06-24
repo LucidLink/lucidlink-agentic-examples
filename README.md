@@ -15,6 +15,13 @@ typically a `via_sdk.py` (hand-wires the SDK as tools) and a `via_mcp.py` (bridg
 
 **→ Browse, set up, and run them from the catalog: [`frameworks/README.md`](./frameworks).**
 
+### IBM Bob mode
+
+A custom **[IBM Bob](https://bob.ibm.com)** mode that lets Bob work with files in your LucidLink
+filespace - navigate, preview edits, and edit safely alongside your teammates and other agents.
+
+**→ Set it up: [`ibm_bob_lucidlink_mode/README.md`](./ibm_bob_lucidlink_mode).**
+
 ## Links
 
 - [LucidLink Python SDK on PyPI](https://pypi.org/project/lucidlink/)
