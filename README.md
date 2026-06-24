@@ -16,6 +16,13 @@ self-contained files - typically a `via_sdk.py` (hand-wires the SDK as tools) an
 Looking for other LucidLink AI integrations? **[LucidLink AI](https://github.com/LucidLink/lucidlink-ai)**
 is the place - it indexes all of them.
 
+### Claws - terminal agents
+
+Wire terminal AI agents - **OpenClaw**, **Hermes**, and **NVIDIA NemoClaw** sandboxes - at your
+filespace through the MCP, then read and write files in plain English.
+
+**→ Set them up: [`claws/README.md`](./claws).**
+
 ## Links
 
 - [LucidLink AI](https://github.com/LucidLink/lucidlink-ai)

@@ -33,7 +33,7 @@ These snippets all read `/brief.md`. Write a demo one - or drop in your own mark
 ```bash
 cp .env.example .env          # fill in LUCIDLINK_TOKEN + LUCIDLINK_FILESPACE
 set -a; source .env; set +a
-uv run --with lucidlink frameworks/seed.py
+uv run --with lucidlink seed.py
 ```
 
 ## Models
@@ -52,10 +52,10 @@ provider-specific constructor) in the file and add that provider's API key to yo
 
 There's no repo-wide dependency manifest - each snippet lists only the packages it actually needs, so you
 install just those instead of every framework's stack. Pass them to `uv run` with `--with` (from the table
-below), or `pip install` them and use `python`. Run from the repo root:
+below), or `pip install` them and use `python`. Run from this `frameworks/` folder:
 
 ```bash
-uv run --with lucidlink --with pydantic-ai frameworks/pydantic_ai/via_sdk.py
+uv run --with lucidlink --with pydantic-ai pydantic_ai/via_sdk.py
 ```
 
 ## Snippets
