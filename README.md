@@ -22,6 +22,14 @@ filespace - navigate, preview edits, and edit safely alongside your teammates an
 
 **→ Set it up: [`ibm_bob_lucidlink_mode/README.md`](./ibm_bob_lucidlink_mode).**
 
+### Kiro power
+
+A custom **[Kiro](https://kiro.dev)** Power that activates on demand when you mention your LucidLink
+filespace - giving Kiro the filespace tools and the safe multi-writer workflow without bloating its
+context the rest of the time.
+
+**→ Set it up: [`kiro_lucidlink_power/README.md`](./kiro_lucidlink_power).**
+
 ## Links
 
 - [LucidLink Python SDK on PyPI](https://pypi.org/project/lucidlink/)

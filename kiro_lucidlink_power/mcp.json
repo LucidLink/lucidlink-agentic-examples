@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "lucidlink": {
+      "command": "uvx",
+      "args": ["lucidlink-mcp"],
+      "autoApprove": [
+        "whoami",
+        "current_filespace",
+        "list_filespaces",
+        "tree",
+        "list_files",
+        "find_files",
+        "grep_files",
+        "read_lines",
+        "read_file",
+        "get_entry",
+        "count_files",
+        "link_filespace",
+        "claim_file",
+        "release_file"
+      ]
+    }
+  }
+}
