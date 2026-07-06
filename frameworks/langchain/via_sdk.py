@@ -10,9 +10,11 @@ from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langchain_core.tools import tool
 
-with lucidlink.Daemon() as daemon:
-    workspace = daemon.authenticate(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
-    fs = workspace.link_filespace(name=os.environ["LUCIDLINK_FILESPACE"]).fs
+with lucidlink.Client() as client:
+    client.login(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
+    workspace = client.get_workspace(client.list_workspaces()[0].id)
+    filespace_id = next(f.id for f in workspace.list_filespaces() if f.name == os.environ["LUCIDLINK_FILESPACE"])
+    fs = workspace.link_filespace(id=filespace_id).fs
 
     @tool
     def list_files(path: str = "/") -> list[str]:

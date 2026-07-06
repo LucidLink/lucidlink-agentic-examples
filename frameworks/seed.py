@@ -20,9 +20,11 @@ case-study content. The launch event is in early September, with a phased
 rollout across email, paid social, and industry webinars.
 """
 
-with lucidlink.Daemon() as daemon:
-    workspace = daemon.authenticate(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
-    fs = workspace.link_filespace(name=os.environ["LUCIDLINK_FILESPACE"]).fs
+with lucidlink.Client() as client:
+    client.login(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
+    workspace = client.get_workspace(client.list_workspaces()[0].id)
+    filespace_id = next(f.id for f in workspace.list_filespaces() if f.name == os.environ["LUCIDLINK_FILESPACE"])
+    fs = workspace.link_filespace(id=filespace_id).fs
     fs.write_file("/brief.md", BRIEF.encode())
 
 print(f"Wrote /brief.md to '{os.environ['LUCIDLINK_FILESPACE']}'.")

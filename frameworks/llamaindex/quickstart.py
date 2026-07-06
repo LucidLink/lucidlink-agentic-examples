@@ -8,9 +8,11 @@ import os
 import lucidlink
 from llama_index.llms.anthropic import Anthropic
 
-with lucidlink.Daemon() as daemon:
-    workspace = daemon.authenticate(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
-    fs = workspace.link_filespace(name=os.environ["LUCIDLINK_FILESPACE"]).fs
+with lucidlink.Client() as client:
+    client.login(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
+    workspace = client.get_workspace(client.list_workspaces()[0].id)
+    filespace_id = next(f.id for f in workspace.list_filespaces() if f.name == os.environ["LUCIDLINK_FILESPACE"])
+    fs = workspace.link_filespace(id=filespace_id).fs
     brief = fs.read_file("/brief.md").decode()
 
 # Any LlamaIndex LLM works - set the matching provider's API key in your env file.
