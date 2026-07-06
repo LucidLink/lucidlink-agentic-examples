@@ -7,31 +7,18 @@ tools) or the [MCP server](https://pypi.org/project/lucidlink-mcp/) (drop in ~35
 
 ## What's here
 
-### Frameworks
-
-Each integration gets its own folder under [`frameworks/`](./frameworks), with tiny, self-contained files -
-typically a `via_sdk.py` (hand-wires the SDK as tools) and a `via_mcp.py` (bridges to the MCP server), plus a
-`quickstart.py` where it helps.
+Each framework integration gets its own folder under [`frameworks/`](./frameworks), with tiny,
+self-contained files - typically a `via_sdk.py` (hand-wires the SDK as tools) and a `via_mcp.py`
+(bridges to the MCP server), plus a `quickstart.py` where it helps.
 
 **→ Browse, set up, and run them from the catalog: [`frameworks/README.md`](./frameworks).**
 
-### IBM Bob mode
-
-A custom **[IBM Bob](https://bob.ibm.com)** mode that lets Bob work with files in your LucidLink
-filespace - navigate, preview edits, and edit safely alongside your teammates and other agents.
-
-**→ Set it up: [`ibm_bob_lucidlink_mode/README.md`](./ibm_bob_lucidlink_mode).**
-
-### Kiro power
-
-A custom **[Kiro](https://kiro.dev)** Power that activates on demand when you mention your LucidLink
-filespace - giving Kiro the filespace tools and the safe multi-writer workflow without bloating its
-context the rest of the time.
-
-**→ Set it up: [`kiro_lucidlink_power/README.md`](./kiro_lucidlink_power).**
+Looking for other LucidLink AI integrations? **[LucidLink AI](https://github.com/LucidLink/lucidlink-ai)**
+is the place - it indexes all of them.
 
 ## Links
 
+- [LucidLink AI](https://github.com/LucidLink/lucidlink-ai)
 - [LucidLink Python SDK on PyPI](https://pypi.org/project/lucidlink/)
 - [LucidLink MCP server on PyPI](https://pypi.org/project/lucidlink-mcp/)
 - [LucidLink Developer Platform KB](https://support.lucidlink.com/hc/en-us/articles/44957651982989-LucidLink-Developer-Platform)
