@@ -16,10 +16,18 @@ self-contained files - typically a `via_sdk.py` (hand-wires the SDK as tools) an
 Looking for other LucidLink AI integrations? **[LucidLink AI](https://github.com/LucidLink/lucidlink-ai)**
 is the place - it indexes all of them.
 
+### Scoped agents - least-privilege service accounts
+
+Let your agent mint **collaborator service accounts** - machine teammates that see nothing until
+granted - and hand a worker agent exactly one folder of your filespace, optionally on a
+self-destructing single-use credential. All in natural language through the MCP.
+
+**→ Walk through it: [`scoped-agents/README.md`](./scoped-agents).**
+
 ### Claws - terminal agents
 
 Wire terminal AI agents - **OpenClaw**, **Hermes**, and **NVIDIA NemoClaw** sandboxes - at your
-filespace through the MCP, then read and write files in plain English.
+filespace through the MCP, then read and write files in natural language.
 
 **→ Set them up: [`claws/README.md`](./claws).**
 
