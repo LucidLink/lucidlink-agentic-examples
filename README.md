@@ -24,6 +24,15 @@ self-destructing single-use credential. All in natural language through the MCP.
 
 **→ Walk through it: [`scoped-agents/README.md`](./scoped-agents).**
 
+### Fleet memory - shared memory for LangGraph agents
+
+Three LangGraph agents share memory as files on a filespace: one folder per namespace, one file
+per memory, an exclusive lock on every update, and an audit trail that attributes each write to
+the agent's own service account. A `BaseStore` adapter over the Python SDK, a two-take collision
+demo, and three agents with three identities and three scopes.
+
+**→ Run it: [`fleet-memory/README.md`](./fleet-memory).**
+
 ### Claws - terminal agents
 
 Wire terminal AI agents - **OpenClaw**, **Hermes**, and **NVIDIA NemoClaw** sandboxes - at your
