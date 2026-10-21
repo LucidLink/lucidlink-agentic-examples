@@ -22,9 +22,10 @@ rollout across email, paid social, and industry webinars.
 
 with lucidlink.Client() as client:
     client.login(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
-    workspace = client.get_workspace(client.list_workspaces()[0].id)
+    workspace = client.workspace
     filespace_id = next(f.id for f in workspace.list_filespaces() if f.name == os.environ["LUCIDLINK_FILESPACE"])
-    fs = workspace.link_filespace(id=filespace_id).fs
-    fs.write_file("/brief.md", BRIEF.encode())
+    filespace = workspace.link_filespace(filespace_id)
+    lucidlink.FsUtils(filespace.file_system).write_bytes("/brief.md", BRIEF.encode())
+    filespace.sync()
 
 print(f"Wrote /brief.md to '{os.environ['LUCIDLINK_FILESPACE']}'.")

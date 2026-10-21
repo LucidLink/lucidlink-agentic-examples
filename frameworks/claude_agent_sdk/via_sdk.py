@@ -23,9 +23,10 @@ from claude_agent_sdk import (
 async def main() -> None:
     with lucidlink.Client() as client:
         client.login(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
-        workspace = client.get_workspace(client.list_workspaces()[0].id)
+        workspace = client.workspace
         filespace_id = next(f.id for f in workspace.list_filespaces() if f.name == os.environ["LUCIDLINK_FILESPACE"])
-        fs = workspace.link_filespace(id=filespace_id).fs
+        filespace = workspace.link_filespace(filespace_id)
+        fs = filespace.file_system
 
         @tool("list_files", "List entries in a filespace directory.", {"path": str})
         async def list_files(args: dict) -> dict:
@@ -34,11 +35,12 @@ async def main() -> None:
 
         @tool("read_file", "Read a UTF-8 text file from the filespace.", {"path": str})
         async def read_file(args: dict) -> dict:
-            return {"content": [{"type": "text", "text": fs.read_file(args["path"]).decode()}]}
+            return {"content": [{"type": "text", "text": lucidlink.FsUtils(fs).read_bytes(args["path"]).decode()}]}
 
         @tool("write_file", "Write a UTF-8 text file to the filespace.", {"path": str, "content": str})
         async def write_file(args: dict) -> dict:
-            fs.write_file(args["path"], args["content"].encode())
+            lucidlink.FsUtils(fs).write_bytes(args["path"], args["content"].encode())
+            filespace.sync()
             return {"content": [{"type": "text", "text": f"wrote {args['path']}"}]}
 
         server = create_sdk_mcp_server(
@@ -47,7 +49,7 @@ async def main() -> None:
             tools=[list_files, read_file, write_file],
         )
         options = ClaudeAgentOptions(
-            model="claude-sonnet-4-6",
+            model="claude-sonnet-5-5",
             tools=[],  # drop built-in file/bash tools - agent uses only our filespace tools
             mcp_servers={"lucidlink": server},
             allowed_tools=["mcp__lucidlink__*"],

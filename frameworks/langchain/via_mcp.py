@@ -1,6 +1,6 @@
 """LangChain / LangGraph agent using the LucidLink MCP server (tools auto-injected).
 
-`langchain-mcp-adapters` launches `uvx lucidlink-mcp` and exposes its tools as
+`langchain-mcp-adapters` launches `uvx lucidlink-mcp@latest` and exposes its tools as
 LangChain tools - no hand-wiring.
 Env: LUCIDLINK_TOKEN, LUCIDLINK_FILESPACE, ANTHROPIC_API_KEY
 """
@@ -20,7 +20,7 @@ async def main() -> None:
             "lucidlink": {
                 "transport": "stdio",
                 "command": "uvx",
-                "args": ["lucidlink-mcp"],
+                "args": ["lucidlink-mcp@latest"],
                 "env": {"LUCIDLINK_TOKEN": os.environ["LUCIDLINK_TOKEN"]},
             }
         }
@@ -28,7 +28,7 @@ async def main() -> None:
     async with client.session("lucidlink") as session:
         tools = await load_mcp_tools(session)
 
-        agent = create_agent(init_chat_model("anthropic:claude-sonnet-4-6"), tools)
+        agent = create_agent(init_chat_model("anthropic:claude-sonnet-5-5"), tools)
         result = await agent.ainvoke(
             {
                 "messages": [
@@ -40,7 +40,7 @@ async def main() -> None:
                 ]
             }
         )
-        print(result["messages"][-1].content)
+        print(result["messages"][-1].text)
 
 
 asyncio.run(main())

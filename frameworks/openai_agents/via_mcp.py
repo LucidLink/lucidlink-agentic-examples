@@ -1,6 +1,6 @@
 """OpenAI Agents SDK agent using the LucidLink MCP server (tools auto-injected).
 
-The SDK launches `uvx lucidlink-mcp` and exposes its tools natively.
+The SDK launches `uvx lucidlink-mcp@latest` and exposes its tools natively.
 This SDK is OpenAI-native, so this example uses an OpenAI model.
 Env: LUCIDLINK_TOKEN, LUCIDLINK_FILESPACE, OPENAI_API_KEY
 """
@@ -17,7 +17,7 @@ async def main() -> None:
     async with MCPServerStdio(
         params={
             "command": "uvx",
-            "args": ["lucidlink-mcp"],
+            "args": ["lucidlink-mcp@latest"],
             "env": {"LUCIDLINK_TOKEN": os.environ["LUCIDLINK_TOKEN"]},
         },
         client_session_timeout_seconds=60,
@@ -25,7 +25,7 @@ async def main() -> None:
         agent = Agent(
             name="Filespace assistant",
             instructions="Use the LucidLink tools to manage filespace files.",
-            model="gpt-4o-mini",
+            model="gpt-5.6-luna",
             mcp_servers=[server],
         )
         result = await Runner.run(

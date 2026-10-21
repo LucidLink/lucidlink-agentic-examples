@@ -5,8 +5,8 @@ file. Search matches on fields only; semantic retrieval is LangMem's or Mem0's j
 
 import json
 import os
-from collections.abc import Iterable
-from contextlib import suppress
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -39,14 +39,32 @@ def open_filespace(
         raise SystemExit(f"{path} is readable by other users; run: chmod 600 {path}")
     client = lucidlink.Client()
     client.login(lucidlink.ServiceAccountCredentials(token=path.read_text().strip()))
-    workspace = client.get_workspace(client.list_workspaces()[0].id)  # a token is tied to exactly one workspace
-    return client, workspace.link_filespace(name=filespace)
+    workspace = client.workspace  # a token is tied to exactly one workspace
+    try:
+        filespace_id = next(f.id for f in workspace.list_filespaces() if f.name == filespace)
+    except StopIteration:
+        client.close()
+        raise SystemExit(f"{path.name} sees no filespace named {filespace!r}") from None
+    return client, workspace.link_filespace(filespace_id)
+
+
+@contextmanager
+def exclusive_lock(fs: lucidlink.FileSystem, path: str) -> Iterator[None]:
+    """Hold an exclusive lock on a whole file, waiting while another client holds it."""
+    native = fs._native
+    handle = native.open(path, "r+b")
+    try:
+        native.lock_byte_range(handle, 0, max(1, fs.get_entry(path).size), "exclusive", blocking=True)
+        yield
+    finally:
+        native.close(handle)
 
 
 class LucidLinkStore(BaseStore):
     def __init__(self, filespace: lucidlink.Filespace, root: str = "/memory"):
         self.filespace = filespace
-        self.fs = filespace.fs
+        self.fs = filespace.file_system
+        self.utils = lucidlink.FsUtils(self.fs)
         self.root = root.rstrip("/")
 
     def _dir(self, namespace: tuple[str, ...]) -> str:
@@ -61,17 +79,19 @@ class LucidLinkStore(BaseStore):
         for part in namespace:
             dirs.append(f"{dirs[-1]}/{part}")
         for d in dirs:
-            if not self.fs.dir_exists(d):
+            try:
+                self.fs.get_entry(d)
+            except FileNotFoundError:
                 with suppress(FileExistsError):
                     self.fs.create_dir(d)
 
     def _write(self, path: str, value: dict[str, Any], created_at: str, updated_at: str) -> None:
         doc = {"value": value, "created_at": created_at, "updated_at": updated_at}
-        self.fs.write_file(path, json.dumps(doc, ensure_ascii=False).encode())
+        self.utils.write_bytes(path, json.dumps(doc, ensure_ascii=False).encode())
 
     def _get(self, namespace: tuple[str, ...], key: str) -> Item | None:
         try:
-            doc = json.loads(self.fs.read_file(self._path(namespace, key)))
+            doc = json.loads(self.utils.read_bytes(self._path(namespace, key)))
         except FileNotFoundError:
             return None
         return Item(
@@ -91,9 +111,10 @@ class LucidLinkStore(BaseStore):
         self._mkdirs(namespace)
         now = datetime.now(timezone.utc).isoformat()
         try:
-            with self.fs.open(path, "r+b", lock_type="exclusive") as f:
-                created_at = json.loads(f.read()).get("created_at", now)
-                self._write(path, value, created_at, now)  # write_file, not f.write: the audit trail attributes it
+            with exclusive_lock(self.fs, path):
+                created_at = json.loads(self.utils.read_bytes(path)).get("created_at", now)
+                self._write(path, value, created_at, now)  # whole-file, not in place: the audit trail attributes it
+                self.filespace.sync()
         except FileNotFoundError:
             self._write(path, value, now, now)
 
@@ -140,7 +161,7 @@ class LucidLinkStore(BaseStore):
             else:
                 raise NotImplementedError(type(op).__name__)
         if wrote:
-            self.filespace.sync_all()  # make the writes visible to every other client
+            self.filespace.sync()  # make the writes visible to every other client
         return results
 
     async def abatch(self, ops: Iterable[Op]) -> list[Result]:

@@ -13,9 +13,10 @@ from anthropic import beta_tool
 
 with lucidlink.Client() as client:
     client.login(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
-    workspace = client.get_workspace(client.list_workspaces()[0].id)
+    workspace = client.workspace
     filespace_id = next(f.id for f in workspace.list_filespaces() if f.name == os.environ["LUCIDLINK_FILESPACE"])
-    fs = workspace.link_filespace(id=filespace_id).fs
+    filespace = workspace.link_filespace(filespace_id)
+    fs = filespace.file_system
 
     @beta_tool
     def list_files(path: str) -> str:
@@ -33,7 +34,7 @@ with lucidlink.Client() as client:
         Args:
             path: File path, e.g. "/brief.md".
         """
-        return fs.read_file(path).decode()
+        return lucidlink.FsUtils(fs).read_bytes(path).decode()
 
     @beta_tool
     def write_file(path: str, content: str) -> str:
@@ -43,12 +44,13 @@ with lucidlink.Client() as client:
             path: Destination path, e.g. "/summary.txt".
             content: Text to write.
         """
-        fs.write_file(path, content.encode())
+        lucidlink.FsUtils(fs).write_bytes(path, content.encode())
+        filespace.sync()
         return f"wrote {path}"
 
     runner = anthropic.Anthropic().beta.messages.tool_runner(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
+        model="claude-sonnet-5-5",
+        max_tokens=16000,
         tools=[list_files, read_file, write_file],
         messages=[{"role": "user", "content": "Read /brief.md and write a one-paragraph summary to /summary.txt."}],
     )

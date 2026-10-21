@@ -6,8 +6,8 @@ One folder per framework. Each holds up to three tiny, self-contained files show
 - **`quickstart.py`** - the smallest possible read: authenticate, read `/brief.md`, summarize it.
 - **`via_sdk.py`** - hand-wire the LucidLink **Python SDK** (`list` / `read` / `write`) as the framework's
   own tools.
-- **`via_mcp.py`** - point the framework at the **LucidLink MCP server** (`uvx lucidlink-mcp`) via its MCP
-  bridge; ~35 filespace tools get injected with almost no glue.
+- **`via_mcp.py`** - point the framework at the **LucidLink MCP server** (`uvx lucidlink-mcp@latest`) via its MCP
+  bridge; 47 filespace tools get injected with almost no glue.
 
 The `via_sdk.py` / `via_mcp.py` files run the **same task** - *read `/brief.md`, write a one-paragraph summary
 to `/summary.txt`* - so you can compare the two wiring styles across frameworks side by side.
@@ -20,7 +20,7 @@ an in-process MCP server (`create_sdk_mcp_server`) - its tool model is always MC
 
 ## Prerequisites
 
-- **Python ≥ 3.10** and **[uv](https://docs.astral.sh/uv/)**
+- **Python ≥ 3.11** and **[uv](https://docs.astral.sh/uv/)**
   (`curl -LsSf https://astral.sh/uv/install.sh | sh`).
 - A **LucidLink service-account token** (`sa_live:...`) and a **filespace name**.
   [Service accounts →](https://support.lucidlink.com/hc/en-us/articles/40222074543757-Getting-Started-with-Service-Accounts-API-Authentication)
@@ -43,8 +43,9 @@ provider-specific constructor) in the file and add that provider's API key to yo
 
 ## Track caveats
 
-- `via_mcp.py` snippets launch the LucidLink MCP server as a subprocess via `uvx lucidlink-mcp` (uv fetches
-  [`lucidlink-mcp`](https://pypi.org/project/lucidlink-mcp/) on first run - no separate install needed).
+- `via_mcp.py` snippets launch the LucidLink MCP server as a subprocess via `uvx lucidlink-mcp@latest` (uv fetches
+  [`lucidlink-mcp`](https://pypi.org/project/lucidlink-mcp/) on first run and picks up new releases - no separate
+  install needed).
 - The `claude_agent_sdk` snippets additionally need the **Claude Code CLI** on your PATH - the Claude
   Agent SDK runs it under the hood (`npm install -g @anthropic-ai/claude-code`).
 
@@ -85,4 +86,6 @@ uv run --with lucidlink --with pydantic-ai pydantic_ai/via_sdk.py
 | `openai_agents/via_mcp.py` | OpenAI Agents SDK | MCP | OpenAI | `openai-agents` |
 | `smolagents/quickstart.py` | Smolagents | quickstart | Claude | `lucidlink "smolagents[litellm]"` |
 | `smolagents/via_sdk.py` | Smolagents | SDK | Claude | `lucidlink "smolagents[litellm]"` |
-| `smolagents/via_mcp.py` | Smolagents | MCP | Claude | `"smolagents[litellm,mcp]"` |
+| `smolagents/via_mcp.py` | Smolagents | MCP | Claude | `"smolagents[litellm,mcp]" "mcp<2"` |
+
+The `mcp<2` pin works around upstream breakage: smolagents' MCP bridge (`mcpadapt`) doesn't support `mcp` 2.x yet.

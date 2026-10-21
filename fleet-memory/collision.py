@@ -14,7 +14,8 @@ import json
 import multiprocessing as mp
 import time
 
-from lucidlink_store import LucidLinkStore, open_filespace
+from lucidlink import FsUtils
+from lucidlink_store import LucidLinkStore, exclusive_lock, open_filespace
 
 NAMESPACE, KEY = ("shared", "customers"), "acme"
 PATH = "/memory/shared/customers/acme.json"
@@ -26,24 +27,25 @@ FACTS = {
 
 def worker(name: str, token_file: str, take: str, barrier, results) -> None:
     client, filespace = open_filespace(token_file)
-    fs = filespace.fs
+    utils = FsUtils(filespace.file_system)
     try:
         barrier.wait(timeout=30)
         started = time.perf_counter()
         waited = 0.0
         if take == "take1":
-            doc = json.loads(fs.read_file(PATH))
+            doc = json.loads(utils.read_bytes(PATH))
             time.sleep(1.0)  # think, while the copy in hand goes stale
             doc["value"]["facts"].append({"by": name, "fact": FACTS[name]})
-            fs.write_file(PATH, json.dumps(doc).encode())
+            utils.write_bytes(PATH, json.dumps(doc).encode())
         else:
-            with fs.open(PATH, "r+b", lock_type="exclusive") as f:
+            with exclusive_lock(filespace.file_system, PATH):
                 waited = time.perf_counter() - started
-                doc = json.loads(f.read())
+                doc = json.loads(utils.read_bytes(PATH))
                 time.sleep(1.0)
                 doc["value"]["facts"].append({"by": name, "fact": FACTS[name]})
-                fs.write_file(PATH, json.dumps(doc).encode())
-        filespace.sync_all()
+                utils.write_bytes(PATH, json.dumps(doc).encode())
+                filespace.sync()
+        filespace.sync()
         results.put((name, round(time.perf_counter() - started, 2), round(waited, 2)))
     finally:
         client.close()

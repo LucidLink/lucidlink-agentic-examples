@@ -18,7 +18,7 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 async def main() -> None:
     server = StdioServerParameters(
         command="uvx",
-        args=["lucidlink-mcp"],
+        args=["lucidlink-mcp@latest"],
         env={"LUCIDLINK_TOKEN": os.environ["LUCIDLINK_TOKEN"]},
     )
     async with stdio_client(server) as (read, write):
@@ -27,8 +27,8 @@ async def main() -> None:
             tools = await mcp.list_tools()
 
             runner = anthropic.AsyncAnthropic().beta.messages.tool_runner(
-                model="claude-sonnet-4-6",
-                max_tokens=1024,
+                model="claude-sonnet-5-5",
+                max_tokens=16000,
                 messages=[
                     {
                         "role": "user",

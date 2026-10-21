@@ -16,11 +16,11 @@ from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 async def main() -> None:
     options = ClaudeAgentOptions(
-        model="claude-sonnet-4-6",
+        model="claude-sonnet-5-5",
         mcp_servers={
             "lucidlink": {
                 "command": "uvx",
-                "args": ["lucidlink-mcp"],
+                "args": ["lucidlink-mcp@latest"],
                 "env": {"LUCIDLINK_TOKEN": os.environ["LUCIDLINK_TOKEN"]},
             }
         },

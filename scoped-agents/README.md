@@ -15,6 +15,9 @@ code, no REST calls, no token ever shown to the agent.
 
 - `lucidlink-mcp` installed and configured with an **admin** service-account
   token ([Getting Started with Service Accounts](https://support.lucidlink.com/hc/en-us/articles/40222074543757-Getting-Started-with-Service-Accounts-API-Authentication)).
+- The MCP server's **admin toolset** turned on: add `LUCIDLINK_MCP_TOOLSETS=admin` to the
+  server's `env` in your MCP client config. The admin tools also need
+  **Node.js 22+** on PATH.
 - Any MCP-capable agent (Claude Code, Claude Desktop, Cursor, a
   [terminal agent](../claws), ...).
 - A folder in your filespace to hand to the worker, e.g. `/projects/alpha`.

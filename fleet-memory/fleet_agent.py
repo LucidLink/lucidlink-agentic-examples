@@ -23,7 +23,7 @@ from lucidlink_store import LucidLinkStore, open_filespace
 
 ROOT = "/memory"
 SHARED = ("shared", "customers")
-MODEL = os.environ.get("FLEET_MODEL", "anthropic:claude-haiku-4-5-20251001")
+MODEL = os.environ.get("FLEET_MODEL", "anthropic:claude-haiku-5-5")
 
 SYSTEM = (
     "You are one agent in a small fleet that shares memory through files on a LucidLink filespace. "
@@ -67,11 +67,11 @@ def main() -> None:
         ]
         if args.role != "reviewer":
             tools.append(create_manage_memory_tool(namespace=SHARED, name="manage_shared_memory"))
-        agent = create_agent(init_chat_model(MODEL, temperature=0), tools, system_prompt=SYSTEM, store=store)
+        agent = create_agent(init_chat_model(MODEL), tools, system_prompt=SYSTEM, store=store)
 
         stamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
         print(f"[{stamp}] {args.role} on {socket.gethostname()} — filespace {filespace.name}, root {ROOT}")
-        result = agent.invoke({"messages": [{"role": "user", "content": BRIEFS[args.role]}]})
+        result = agent.invoke({"messages": [{"role": "user", "content": BRIEFS[args.role]}]}, {"max_concurrency": 1})
         for message in result["messages"]:
             if message.type == "ai" and message.tool_calls:
                 for call in message.tool_calls:
@@ -79,7 +79,7 @@ def main() -> None:
                     print(f"  tool  {call['name']}({json.dumps(shown, ensure_ascii=False)})")
             elif message.type == "tool":
                 print(f"  ->    {str(message.content)[:140]}")
-        print(f"\n{args.role} says:\n{result['messages'][-1].content}\n")
+        print(f"\n{args.role} says:\n{result['messages'][-1].text}\n")
     finally:
         client.close()
 

@@ -14,9 +14,10 @@ from llama_index.llms.anthropic import Anthropic
 async def main() -> None:
     with lucidlink.Client() as client:
         client.login(lucidlink.ServiceAccountCredentials(token=os.environ["LUCIDLINK_TOKEN"]))
-        workspace = client.get_workspace(client.list_workspaces()[0].id)
+        workspace = client.workspace
         filespace_id = next(f.id for f in workspace.list_filespaces() if f.name == os.environ["LUCIDLINK_FILESPACE"])
-        fs = workspace.link_filespace(id=filespace_id).fs
+        filespace = workspace.link_filespace(filespace_id)
+        fs = filespace.file_system
 
         def list_files(path: str = "/") -> list[str]:
             """List entries in a filespace directory."""
@@ -24,16 +25,17 @@ async def main() -> None:
 
         def read_file(path: str) -> str:
             """Read a UTF-8 text file from the filespace."""
-            return fs.read_file(path).decode()
+            return lucidlink.FsUtils(fs).read_bytes(path).decode()
 
         def write_file(path: str, content: str) -> str:
             """Write a UTF-8 text file to the filespace."""
-            fs.write_file(path, content.encode())
+            lucidlink.FsUtils(fs).write_bytes(path, content.encode())
+            filespace.sync()
             return f"wrote {path}"
 
         agent = FunctionAgent(
             tools=[list_files, read_file, write_file],
-            llm=Anthropic(model="claude-sonnet-4-6", max_tokens=4096),  # default is 512
+            llm=Anthropic(model="claude-sonnet-5-5", max_tokens=4096),  # default is 512
         )
         response = await agent.run("Read /brief.md and write a one-paragraph summary to /summary.txt.")
         print(response)

@@ -1,6 +1,6 @@
 """Pydantic AI agent using the LucidLink MCP server (tools auto-injected).
 
-An MCPToolset wraps the stdio server (`uvx lucidlink-mcp`) and exposes its tools.
+An MCPToolset wraps the stdio server (`uvx lucidlink-mcp@latest`) and exposes its tools.
 Env: LUCIDLINK_TOKEN, LUCIDLINK_FILESPACE, ANTHROPIC_API_KEY
 """
 
@@ -13,11 +13,11 @@ from pydantic_ai.mcp import MCPToolset, StdioTransport
 toolset = MCPToolset(
     StdioTransport(
         command="uvx",
-        args=["lucidlink-mcp"],
+        args=["lucidlink-mcp@latest"],
         env={"LUCIDLINK_TOKEN": os.environ["LUCIDLINK_TOKEN"]},
     )
 )
-agent = Agent("anthropic:claude-sonnet-4-6", toolsets=[toolset])
+agent = Agent("anthropic:claude-sonnet-5-5", toolsets=[toolset])
 
 
 async def main() -> None:

@@ -1,4 +1,4 @@
-lucidlink==0.15.0
+lucidlink==1.0.0
 langgraph==1.2.14
 langmem==0.0.30
 langchain==1.4.3
