@@ -41,32 +41,24 @@ hermes
 
 ## NemoClaw
 
-The daemon cannot run in the sandbox: OpenShell egress is proxy-only and the daemon does its own DNS, so it cannot traverse the CONNECT proxy (upstream: [NVIDIA/OpenShell#1107](https://github.com/NVIDIA/OpenShell/issues/1107)). Run the MCP on the host and reach it over SSE. `<sb>` is your sandbox name.
+NemoClaw adds MCP servers as HTTPS endpoints and injects the bearer token at egress, so LucidLink credentials
+and decrypted files never enter the sandbox. `<sb>` is your sandbox name.
 
 ```bash
-# 1. HOST: MCP server + token, served over SSE on the sandbox's bridge gateway IP
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# 1. HOST: MCP server behind HTTPS on the host's private address
+curl -LsSf https://astral.sh/uv/install.sh | sh && chmod 755 ~/.local
 export PATH="$HOME/.local/bin:$PATH"
 uv tool install lucidlink-mcp
 lucidlink-mcp-setup                                  # paste your sa_live:... token
-CID=$(docker ps --format '{{.Names}}' | grep -m1 "openshell-<sb>-")
-BRIDGE=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' "$CID")
-LUCIDLINK_FILESPACE=<your-filespace> uvx mcp-proxy --host "$BRIDGE" --port 8808 --pass-environment lucidlink-mcp &
+IP=$(hostname -I | awk '{print $1}')
+export LUCIDLINK_MCP_HTTP_BEARER=$(openssl rand -hex 32)
+LUCIDLINK_FILESPACE=<your-filespace> lucidlink-mcp --http --no-path-secret --write --port 8811 --allowed-host "$IP" &
+caddy reverse-proxy --from "https://$IP:8443" --to 127.0.0.1:8811 --internal-certs --disable-redirects &   # needs Caddy installed
 
-# 2. SANDBOX: allow the agent's node binary to reach that endpoint
-cat > lucidlink-sse.yaml <<YAML
-preset: { name: lucidlink-sse, description: "host LucidLink MCP over SSE" }
-network_policies:
-  lucidlink-sse:
-    name: lucidlink-sse
-    endpoints:
-      - { host: "$BRIDGE", port: 8808, access: full, tls: skip, allowed_ips: ["$BRIDGE/32"] }
-    binaries:
-      - { path: /usr/local/bin/node }
-YAML
-nemoclaw <sb> policy-add --from-file lucidlink-sse.yaml --yes
+# 2. SANDBOX: trust Caddy's certificate
+NEMOCLAW_CORPORATE_CA_BUNDLE=~/.local/share/caddy/pki/authorities/local/root.crt nemoclaw onboard
 
-# 3. Chat
-nemoclaw <sb> exec -- openclaw mcp set lucidlink "{\"type\":\"sse\",\"url\":\"http://$BRIDGE:8808/sse\"}"
-nemoclaw <sb> exec -- openclaw agent --agent main -m "create /mcp-smoke.txt with 'hello from NemoClaw', then read it back"
+# 3. Register and chat
+nemoclaw <sb> mcp add lucidlink --url "https://$IP:8443/mcp" --env LUCIDLINK_MCP_HTTP_BEARER --trusted-private-host "$IP"
+nemoclaw <sb> exec -- openclaw agent --agent main -m "Use the lucidlink tools: create /mcp-smoke.txt with 'hello from NemoClaw', then read it back"
 ```
