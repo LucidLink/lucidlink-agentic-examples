@@ -1,0 +1,40 @@
+gateway_endpoint = "http://127.0.0.1:17671"
+workspace        = "lucidlink-agents"
+
+images = {
+  openclaw = "nc-fabric@sha256:<openclaw digest>"
+  claude   = "nc-fabric@sha256:<claude digest>"
+}
+
+filespace = {
+  name         = "my-filespace"
+  id           = "<filespace uuid>"            # lucid status: Filespace id
+  storage_host = "s3.us-west-1.amazonaws.com"  # lucid status: object store
+}
+
+# One service account per agent (host/install-host.sh mcp-token <agent> < token), so the audit trail names the agent.
+# The agent runs as the same uid as its MCP server and can read this token, so the account's grants are the real
+# boundary: give read-only agents a read-only account, not just `read_only = true`.
+lucidlink_credentials = {
+  researcher = "/etc/lucid-agent/mcp-researcher"   # read on /agents/team-skills
+  coder      = "/etc/lucid-agent/mcp-coder"        # read+write on /agents/coder
+}
+
+# host/install-host.sh mount <instance> ...   (lucid-agent@<instance>, runs as uid 10001)
+lucidlink_folders = {
+  skills = { host_path = "/srv/lucid-ro-skills", read_only = true }        # read-only service account
+  coder  = { host_path = "/srv/lucid-agent-coder" }                       # /agents/coder, mounted with the coder's account
+}
+
+agents = {
+  researcher = {
+    harness = "openclaw"
+    mcp     = { credential = "researcher", read_only = true }   # read_only only trims the tool list
+    skills  = "skills"
+  }
+  coder = {
+    harness   = "claude"
+    mcp       = { credential = "coder" }
+    workspace = "coder"
+  }
+}

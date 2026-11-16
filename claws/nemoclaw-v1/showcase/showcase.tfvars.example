@@ -1,0 +1,35 @@
+# Showcase settings for examples/two-agents: two agents (OpenClaw and Claude Code), each with its own service
+# account, editing one shared file under LucidLink locks. See README.md for the steps.
+gateway_endpoint = "http://127.0.0.1:17671"
+workspace        = "lucidlink-showcase"
+
+images = {
+  openclaw = "nc-fabric@sha256:<openclaw digest>"
+  claude   = "nc-fabric@sha256:<claude digest>"
+}
+
+filespace = {
+  name         = "my-filespace"
+  id           = "<filespace uuid>"
+  storage_host = "s3.us-west-1.amazonaws.com"
+}
+
+# One service account each, both with read+write on /agents/shared only (host/install-host.sh mcp-token writer-a ...).
+lucidlink_credentials = {
+  writer-a = "/etc/lucid-agent/mcp-writer-a"
+  writer-b = "/etc/lucid-agent/mcp-writer-b"
+}
+lucidlink_folders = {}
+
+agents = {
+  writer-a = {
+    harness      = "openclaw"
+    mcp          = { credential = "writer-a" }
+    instructions = "You share files on a LucidLink filespace with other agents. Before changing a shared file, take claim_file on it (blocking=true), then read it, write the whole new content with write_file, and release_file right away. Never write a shared file without holding its claim."
+  }
+  writer-b = {
+    harness      = "claude"
+    mcp          = { credential = "writer-b" }
+    instructions = "You share files on a LucidLink filespace with other agents. Before changing a shared file, take claim_file on it (blocking=true), then read it, write the whole new content with write_file, and release_file right away. Never write a shared file without holding its claim."
+  }
+}

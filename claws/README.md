@@ -39,7 +39,7 @@ hermes
 #   > create /mcp-smoke.txt with "hello from Hermes", then read it back
 ```
 
-## NemoClaw
+## NemoClaw (current release)
 
 NemoClaw adds MCP servers as HTTPS endpoints and injects the bearer token at egress, so LucidLink credentials
 and decrypted files never enter the sandbox. `<sb>` is your sandbox name.
@@ -62,3 +62,25 @@ NEMOCLAW_CORPORATE_CA_BUNDLE=~/.local/share/caddy/pki/authorities/local/root.crt
 nemoclaw <sb> mcp add lucidlink --url "https://$IP:8443/mcp" --env LUCIDLINK_MCP_HTTP_BEARER --trusted-private-host "$IP"
 nemoclaw <sb> exec -- openclaw agent --agent main -m "Use the lucidlink tools: create /mcp-smoke.txt with 'hello from NemoClaw', then read it back"
 ```
+
+## NemoClaw v1 (preview)
+
+NemoClaw v1, the unreleased `v1` branch, is declarative: a YAML config for `nemoclaw apply`, or OpenTofu providers
+for OpenShell sandboxes and NeMo Fabric agents. `mcp add` is gone. Instead, [`nemoclaw-v1/`](./nemoclaw-v1) is a
+recipe in both forms that gives agents in stock `nc-fabric` images the LucidLink MCP tools and LucidLink folders: a
+workspace that outlives the sandbox and a read-only team skills folder, with one service account per agent.
+
+```bash
+# 1. Host: LucidLink mounts as the sandbox's user, started before Docker; tokens only on stdin
+sudo nemoclaw-v1/host/install-host.sh base
+sudo nemoclaw-v1/host/install-host.sh mount 1 <filespace>.<workspace> /agents/team-skills /srv/lucid-ro-skills < team-ro.token
+sudo nemoclaw-v1/host/install-host.sh mount 2 <filespace>.<workspace> /agents/coder /srv/lucid-agent-coder < coder.token
+sudo nemoclaw-v1/host/install-host.sh mcp-token researcher < researcher.token
+sudo nemoclaw-v1/host/install-host.sh mcp-token coder < coder.token
+
+# 2. Agents: an OpenClaw researcher (read-only) and a Claude Code coder (its own folder as workspace)
+cd nemoclaw-v1/yaml && cp lucidlink.env.example lucidlink.env    # then fill it in
+./prepare.sh && ANTHROPIC_API_KEY=... nemoclaw apply --state-dir .nemoclaw lucidlink-agents.yaml
+```
+
+To use OpenTofu instead, and for the details, see [`nemoclaw-v1/README.md`](./nemoclaw-v1).

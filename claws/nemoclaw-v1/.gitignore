@@ -1,0 +1,17 @@
+.terraform/
+# The providers come from your NemoClaw bundle's filesystem mirror (dev versions); a lock file made from
+# one bundle's hashes would not match another's, so don't commit it.
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.plan
+terraform.tfvars
+*.log
+# YAML flavour: per-host settings and the rendered config
+yaml/lucidlink.env
+yaml/lucidlink-agents.yaml
+yaml/.nemoclaw/
+showcase/showcase.tfvars
+showcase/*.out
+examples/two-agents/providers_override.tf

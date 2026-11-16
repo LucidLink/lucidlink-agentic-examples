@@ -1,0 +1,29 @@
+# Re-apply one agent deployment after boot (settings in /etc/lucid-agent/apply-<name>.env). The gateway restarts the
+# sandboxes, but agent runtimes don't survive a reboot; an apply restarts them in place. The lucid-agent@ mounts start
+# before Docker, so After=docker.service also means they are up.
+#
+# Install (adjust User and the script path):
+#   sudo install -m 0644 host/agents-apply@.service /etc/systemd/system/
+#   /etc/lucid-agent/apply-<name>.env, root:root 0600 (systemd reads it before switching to User): see agents-apply.sh
+#   sudo systemctl daemon-reload && sudo systemctl enable agents-apply@<name>
+[Unit]
+Description=Re-apply agent deployment %i (restarts Fabric runtimes)
+Wants=network-online.target
+After=network-online.target docker.service
+# Retry for about 15 minutes while the gateway restarts sandboxes.
+StartLimitIntervalSec=1200
+StartLimitBurst=40
+
+[Service]
+Type=oneshot
+Restart=on-failure
+RestartSec=20
+RestartPreventExitStatus=2
+User=ubuntu
+EnvironmentFile=/etc/lucid-agent/apply-%i.env
+# One deployment at a time: several restarting all their runtimes at once can starve a small host.
+ExecStart=/usr/bin/flock /run/lock/agents-apply.lock /opt/lucidlink-nemoclaw/host/agents-apply.sh
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

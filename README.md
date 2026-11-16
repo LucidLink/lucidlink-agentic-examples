@@ -36,7 +36,8 @@ demo, and three agents with three identities and three scopes.
 ### Claws - terminal agents
 
 Wire terminal AI agents - **OpenClaw**, **Hermes**, and **NVIDIA NemoClaw** sandboxes - at your
-filespace through the MCP, then read and write files in natural language.
+filespace through the MCP, then read and write files in natural language. For NemoClaw v1 (preview), a
+recipe in YAML and OpenTofu also mounts LucidLink folders into sandboxes.
 
 **→ Set them up: [`claws/README.md`](./claws).**
 

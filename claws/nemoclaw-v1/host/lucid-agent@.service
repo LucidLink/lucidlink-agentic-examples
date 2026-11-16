@@ -1,0 +1,34 @@
+# LucidLink daemon instance for NemoClaw/OpenShell sandbox volumes.
+# One instance per (service account, uid, root-point). Settings: /etc/lucid-agent/%i.env
+# Token: /etc/lucid-agent/%i.token (root:root 0600), passed on stdin; never on the command line.
+[Unit]
+Description=LucidLink agent mount, instance %i
+Wants=network-online.target
+After=network-online.target
+# Mount must exist before Docker starts containers whose volumes bind it.
+Before=docker.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=llagent
+Group=llagent
+EnvironmentFile=/etc/lucid-agent/%i.env
+StandardInput=file:/etc/lucid-agent/%i.token
+StandardOutput=journal
+StandardError=journal
+# Clear a stale mount left by a crashed or killed daemon ("Transport endpoint is not connected").
+ExecStartPre=-/usr/bin/fusermount3 -uz ${LUCID_MOUNT_POINT}
+ExecStart=/usr/local/bin/lucid daemon --instance %i --fs ${LUCID_FS} --login-token "" --root-point ${LUCID_ROOT_POINT} --mount-point ${LUCID_MOUNT_POINT} --fuse-allow-other --no-progress
+# Report "started" only once the FUSE mount is live, so Before=docker.service means something.
+ExecStartPost=/bin/sh -c 'for i in $(seq 1 90); do mountpoint -q "$LUCID_MOUNT_POINT" && exit 0; sleep 1; done; echo "mount not ready" >&2; exit 1'
+ExecStop=/usr/local/bin/lucid --instance %i exit
+ExecStopPost=-/usr/bin/fusermount3 -uz ${LUCID_MOUNT_POINT}
+TimeoutStopSec=30
+KillMode=mixed
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
