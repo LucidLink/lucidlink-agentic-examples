@@ -4,8 +4,8 @@
 | --- | --- |
 | Description | Gives NemoClaw v1 agents a LucidLink filespace: shared team skills, a persistent folder per agent, and file tools under each agent's own identity, with every change in the audit trail. |
 | Industry | ✨ Other |
-| Requirements | Linux x86_64 · Docker · NemoClaw v1 preview bundle and images · LucidLink filespace and service accounts · NVIDIA and Anthropic API keys |
-| NemoClaw | v1 branch, commit `ce910d0` |
+| Requirements | Linux x86-64 · Docker · NemoClaw v1 preview bundle and images · LucidLink filespace and service accounts · NVIDIA and Anthropic API keys |
+| NemoClaw | 0.1.0 |
 | Harness | OpenClaw 2026.9.34 |
 | OpenShell | 0.1.8 |
 | Reviewed | 2026-11-17 |
