@@ -24,11 +24,13 @@ lucidlink_folders = {}
 agents = {
   writer-a = {
     harness      = "openclaw"
+    model        = { inference = "nvidia", name = "nvidia/nemotron-3.5-super-vl-120b-a12b" }
     mcp          = { credential = "writer-a" }
     instructions = "You share files on a LucidLink filespace with other agents. Before changing a shared file, take claim_file on it (blocking=true), then read it, write the whole new content with write_file, and release_file right away. Never write a shared file without holding its claim."
   }
   writer-b = {
     harness      = "claude"
+    model        = { inference = "anthropic", name = "claude-sonnet-4-6" }
     mcp          = { credential = "writer-b" }
     instructions = "You share files on a LucidLink filespace with other agents. Before changing a shared file, take claim_file on it (blocking=true), then read it, write the whole new content with write_file, and release_file right away. Never write a shared file without holding its claim."
   }

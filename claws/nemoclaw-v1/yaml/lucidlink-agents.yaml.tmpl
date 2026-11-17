@@ -1,12 +1,13 @@
 # Two NemoClaw v1 agents on one LucidLink filespace, rendered by prepare.sh from lucidlink.env.
 #
 #   researcher  OpenClaw     read-only LucidLink MCP tools; team skills from a read-only folder at /sandbox/skills
+#                            model: ${RESEARCHER_MODEL} from provider ${RESEARCHER_PROVIDER}
 #   coder       Claude Code  LucidLink MCP tools; its own LucidLink folder as /sandbox/workspace
+#                            model: ${CODER_MODEL} from Anthropic
 #
 # Each agent has its own service account, so the filespace audit trail names it. The volumes below were created by
-# prepare.sh and labelled for this deployment's OpenShell workspace (${WORKSPACE}). NemoClaw's YAML has no anchors,
-# so each sandbox repeats the two network grants: they let only the MCP server's Python reach the LucidLink hub and
-# this filespace's bucket.
+# prepare.sh and labelled for this deployment's OpenShell workspace (${WORKSPACE}). Both sandboxes select the two
+# LucidLink grants, which let only the MCP server's Python reach the LucidLink hub and this filespace's bucket.
 
 apiVersion: nemoclaw.nvidia.com/v1alpha1
 kind: NemoClawConfig
@@ -27,6 +28,11 @@ spec:
         enable_bind_mounts: true     # ...including bind-backed ones (LucidLink folders)
 
   inferenceProviders:
+    nvidia:                          # NVIDIA API (Nemotron), OpenAI-compatible
+      provider: openai
+      endpoint: https://integrate.api.nvidia.com/v1
+      credential:
+        env: NVIDIA_API_KEY
     anthropic:                       # OpenClaw: endpoint with /v1
       provider: anthropic
       endpoint: https://api.anthropic.com/v1
@@ -37,6 +43,26 @@ spec:
       endpoint: https://api.anthropic.com
       credential:
         env: ANTHROPIC_API_KEY
+
+  grants:
+    lucidlink-hub:                   # sign-in and the filespace's metadata hub; the client pins its own TLS
+      endpoints:
+      - { host: api.lucidlink.com, port: 443, tls: skip }
+      - { host: discovery-service.lucidlink.com, port: 443, tls: skip }
+      - { host: '${FILESPACE_ID}.fs.lucidlink.com', port: 443, tls: skip }
+      binaries:
+      - path: '${INTERPRETER}'
+    lucidlink-storage:               # this filespace's bucket only
+      endpoints:
+      - host: '${STORAGE_HOST}'
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+        - allow: { method: '*', path: '/${BUCKET}' }
+        - allow: { method: '*', path: '/${BUCKET}/**' }
+      binaries:
+      - path: '${INTERPRETER}'
 
   sandboxes:
     researcher:
@@ -50,49 +76,32 @@ spec:
           - { type: volume, source: ${SKILLS_VOL}, target: /sandbox/skills, read_only: true }
       network:
         tier: isolated
-        grants:
-          lucidlink-hub:
-            endpoints:
-            - { host: api.lucidlink.com, port: 443, tls: skip }
-            - { host: discovery-service.lucidlink.com, port: 443, tls: skip }
-            - { host: '${FILESPACE_ID}.fs.lucidlink.com', port: 443, tls: skip }
-            binaries:
-            - path: '${INTERPRETER}'
-          lucidlink-storage:
-            endpoints:
-            - host: '${STORAGE_HOST}'
-              port: 443
-              protocol: rest
-              enforcement: enforce
-              rules:
-              - allow: { method: '*', path: '/${BUCKET}' }
-              - allow: { method: '*', path: '/${BUCKET}/**' }
-            binaries:
-            - path: '${INTERPRETER}'
+        grantRefs: [lucidlink-hub, lucidlink-storage]
       harness:
         kind: nvidia.fabric.openclaw
-        config:
-          mcp:
-            servers:
-              lucidlink:
-                transport: stdio
-                exposure: harness_native
-                url: /opt/lucidlink/bin/lucidlink-mcp-launch
-                env:
-                  LUCIDLINK_FILESPACE: '${FILESPACE_NAME}'
-                  LUCIDLINK_MCP_READ_ONLY: '1'     # trims the tool list; the account's read-only grant enforces it
-          skills:
-            directories:
-            - folder: /sandbox/skills
-            duplicates: reject
+        settings:
+          startup_timeout_seconds: 75      # the maximum; OpenClaw can miss the 60-second default on a busy host
       agent:
         name: main
+        mcp:
+          servers:
+            lucidlink:
+              transport: stdio
+              exposure: harness_native
+              url: /opt/lucidlink/bin/lucidlink-mcp-launch
+              env:
+                LUCIDLINK_FILESPACE: '${FILESPACE_NAME}'
+                LUCIDLINK_MCP_READ_ONLY: '1'     # trims the tool list; the account's read-only grant enforces it
+        skills:
+          directories:
+          - folder: /sandbox/skills
+          duplicates: reject
         inference:
           routes:
           - name: primary
-            providerRef: anthropic
+            providerRef: '${RESEARCHER_PROVIDER}'
             overrides:
-              model: '${MODEL}'
+              model: '${RESEARCHER_MODEL}'
 
     coder:
       image:
@@ -105,41 +114,22 @@ spec:
           - { type: volume, source: ${CODER_VOL}, target: /sandbox/workspace, read_only: false }
       network:
         tier: isolated
-        grants:
-          lucidlink-hub:
-            endpoints:
-            - { host: api.lucidlink.com, port: 443, tls: skip }
-            - { host: discovery-service.lucidlink.com, port: 443, tls: skip }
-            - { host: '${FILESPACE_ID}.fs.lucidlink.com', port: 443, tls: skip }
-            binaries:
-            - path: '${INTERPRETER}'
-          lucidlink-storage:
-            endpoints:
-            - host: '${STORAGE_HOST}'
-              port: 443
-              protocol: rest
-              enforcement: enforce
-              rules:
-              - allow: { method: '*', path: '/${BUCKET}' }
-              - allow: { method: '*', path: '/${BUCKET}/**' }
-            binaries:
-            - path: '${INTERPRETER}'
+        grantRefs: [lucidlink-hub, lucidlink-storage]
       harness:
         kind: nvidia.fabric.claude
-        config:
-          mcp:
-            servers:
-              lucidlink:
-                transport: stdio
-                exposure: harness_native
-                url: /opt/lucidlink/bin/lucidlink-mcp-launch
-                env:
-                  LUCIDLINK_FILESPACE: '${FILESPACE_NAME}'
       agent:
         name: main
+        mcp:
+          servers:
+            lucidlink:
+              transport: stdio
+              exposure: harness_native
+              url: /opt/lucidlink/bin/lucidlink-mcp-launch
+              env:
+                LUCIDLINK_FILESPACE: '${FILESPACE_NAME}'
         inference:
           routes:
           - name: primary
             providerRef: anthropic-root
             overrides:
-              model: '${MODEL}'
+              model: '${CODER_MODEL}'

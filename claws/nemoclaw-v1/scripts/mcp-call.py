@@ -1,4 +1,4 @@
-"""Call one LucidLink MCP tool from inside a sandbox, without an LLM (used by run.sh to reset and count the board).
+"""Call one LucidLink MCP tool from inside a sandbox, without an LLM (used by verify.sh and showcase/run.sh).
 
 Runs with the toolchain's Python (the only program allowed to reach LucidLink) and starts the sandbox's own MCP
 server over stdio:  python - <tool> '<json arguments>'  (script on stdin). Prints the tool's text result.

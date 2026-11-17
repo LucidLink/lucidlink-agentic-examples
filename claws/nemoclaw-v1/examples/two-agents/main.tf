@@ -1,7 +1,7 @@
 # Two agents on one LucidLink filespace, in plain OpenTofu against NemoClaw v1's providers. By default:
 #
-#   researcher  OpenClaw     read-only LucidLink MCP tools; team skills from a read-only folder
-#   coder       Claude Code  LucidLink MCP tools; its own LucidLink folder as its workspace
+#   researcher  OpenClaw     read-only LucidLink MCP tools; team skills from a read-only folder; Nemotron
+#   coder       Claude Code  LucidLink MCP tools; its own LucidLink folder as its workspace; Claude
 #
 # Stock nc-fabric images; the volumes come from modules/lucidlink and the host side from host/install-host.sh.
 
@@ -30,15 +30,24 @@ provider "fabric" {
 locals {
   harnesses = {
     # instructions: OpenClaw only supports replacing the system prompt; Claude Code keeps its own and appends.
-    openclaw = { adapter_id = "nvidia.fabric.openclaw", image = var.images.openclaw, inference = "anthropic", instructions = "replace" }
-    claude   = { adapter_id = "nvidia.fabric.claude", image = var.images.claude, inference = "anthropic-root", instructions = "append" }
+    # startup_timeout_seconds: 75 is the maximum; OpenClaw can miss the 60-second default on a busy host.
+    openclaw = { adapter_id = "nvidia.fabric.openclaw", image = var.images.openclaw, instructions = "replace", settings = { startup_timeout_seconds = 75 } }
+    claude   = { adapter_id = "nvidia.fabric.claude", image = var.images.claude, instructions = "append", settings = {} }
   }
 
-  # OpenClaw wants the endpoint with /v1; the Claude adapter appends /v1 itself (else /v1/v1/messages).
-  inference = {
-    "anthropic"      = "https://api.anthropic.com/v1"
-    "anthropic-root" = "https://api.anthropic.com"
+  # Each agent's model endpoint. For Anthropic's API, OpenClaw wants the endpoint with /v1 and the Claude adapter
+  # appends /v1 itself (else /v1/v1/messages), so the two register separate endpoints.
+  endpoints = {
+    for name, a in var.agents : name => {
+      key = (var.inference[a.model.inference].api == "anthropic-messages" && a.harness == "openclaw"
+      ? "${a.model.inference}-v1" : a.model.inference)
+      url = (var.inference[a.model.inference].api == "anthropic-messages" && a.harness == "openclaw"
+      ? "${trimsuffix(var.inference[a.model.inference].endpoint, "/")}/v1" : var.inference[a.model.inference].endpoint)
+      api            = var.inference[a.model.inference].api
+      credential_env = var.inference[a.model.inference].credential_env
+    }
   }
+  inference = { for e in values(local.endpoints) : e.key => e... }
 
   skills_path    = "/sandbox/skills"
   workspace_path = "/sandbox/workspace"
@@ -107,23 +116,23 @@ locals {
   binaries = { for name, h in data.fabric_harness.agent : name => jsondecode(h.launch_json).binaries }
 
   inference_binaries = {
-    for inf in keys(local.inference) : inf => sort(distinct(flatten([
-      for name, a in var.agents : local.binaries[name] if local.harnesses[a.harness].inference == inf
+    for key in keys(local.inference) : key => sort(distinct(flatten([
+      for name, e in local.endpoints : local.binaries[name] if e.key == key
     ])))
   }
 }
 
 resource "openshell_inference" "model" {
-  for_each  = { for inf, bins in local.inference_binaries : inf => bins if length(bins) > 0 }
+  for_each  = local.inference
   gateway   = local.gateway
   workspace = openshell_workspace.this.ref
   name      = each.key
-  api       = "anthropic-messages"
-  binaries  = each.value
+  api       = each.value[0].api
+  binaries  = local.inference_binaries[each.key]
   server = {
     type              = "inference_server"
-    endpoint          = local.inference[each.key]
-    credential_env    = var.model.credential_env
+    endpoint          = each.value[0].url
+    credential_env    = each.value[0].credential_env
     credential_source = ""
   }
 }
@@ -132,7 +141,7 @@ locals {
   agents = {
     for name, a in var.agents : name => {
       harness   = a.harness
-      inference = local.harnesses[a.harness].inference
+      inference = local.endpoints[name].key
       mcp       = a.mcp == null ? null : module.lucidlink.mcp[a.mcp.credential]
       read_only = a.mcp == null ? false : a.mcp.read_only
       mounts = concat(
@@ -148,17 +157,17 @@ locals {
       policies = concat(
         flatten([for c in(a.mcp == null ? [] : [a.mcp.credential]) : module.lucidlink.mcp[c].policies]),
         [{
-          name     = "inference-${local.harnesses[a.harness].inference}"
+          name     = "inference-${local.endpoints[name].key}"
           binaries = []
           endpoints = [{
-            host = "api.anthropic.com", port = 443, protocol = "rest", path = "/v1/**", access = "full",
-            tls  = null, enforcement = null, rules = []
+            host = regex("^https://([^/:]+)", local.endpoints[name].url)[0], port = 443, protocol = "rest",
+            path = "/v1/**", access = "full", tls = null, enforcement = null, rules = []
           }]
         }],
       )
       config = {
         instructions = a.instructions
-        model        = var.model.name
+        model        = a.model
         skills       = a.skills != null
         mcp          = a.mcp
       }
@@ -236,6 +245,7 @@ resource "fabric_agent" "agent" {
   sandbox  = openshell_sandbox.agent[each.key].ref
   harness  = data.fabric_harness.agent[each.key].ref
   name     = "main"
+  settings = jsonencode(local.harnesses[each.value.harness].settings)
 
   environment {
     provider  = "local"
@@ -253,9 +263,9 @@ resource "fabric_agent" "agent" {
   }
 
   models "default" {
-    provider    = "anthropic"
-    model       = var.model.name
-    base_url    = local.inference[each.value.inference]
+    provider    = local.endpoints[each.key].api == "anthropic-messages" ? "anthropic" : "openai"
+    model       = var.agents[each.key].model.name
+    base_url    = local.endpoints[each.key].url
     api_key_env = openshell_inference.model[each.value.inference].sandbox_env
   }
 

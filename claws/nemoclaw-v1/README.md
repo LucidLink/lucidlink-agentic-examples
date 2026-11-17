@@ -1,179 +1,190 @@
-# LucidLink for NemoClaw v1
+# LucidLink Filespace for NemoClaw Agents
 
-A base recipe that connects NVIDIA NemoClaw v1 agents to a LucidLink filespace, declaratively. It comes in both of
-NemoClaw v1's forms: a **YAML config for `nemoclaw apply`** and **plain OpenTofu** against the providers NemoClaw
-ships. It uses stock `nc-fabric` images, and no token ends up in NemoClaw's state, plans or agent config.
+| Catalog field | Value |
+| --- | --- |
+| Description | Gives NemoClaw v1 agents a LucidLink filespace: shared team skills, a persistent folder per agent, and file tools under each agent's own identity, with every change in the audit trail. |
+| Industry | ✨ Other |
+| Requirements | Linux x86_64 · Docker · NemoClaw v1 preview bundle and images · LucidLink filespace and service accounts · NVIDIA and Anthropic API keys |
+| NemoClaw | v1 branch, commit `ce910d0` |
+| Harness | OpenClaw 2026.9.34 |
+| OpenShell | 0.1.8 |
+| Reviewed | 2026-11-17 |
+| Contributor | LucidLink |
+
+This example was contributed by [LucidLink](https://www.lucidlink.com). For questions or support, contact
+[support@lucidlink.com](mailto:support@lucidlink.com).
+
+NemoClaw v1 runs each agent in an OpenShell sandbox and leaves storage and identity to the platform. This example
+supplies both from a LucidLink filespace, using NemoClaw as designed: Docker volumes on the sandbox, network policy
+grants, and a stdio MCP server in the agent configuration. It uses stock `nc-fabric` images. No secret is part of
+the NemoClaw configuration, its state or its plans.
 
 > **Preview.** NemoClaw v1 is the unreleased `v1` branch of [NVIDIA/NemoClaw](https://github.com/NVIDIA/NemoClaw)
-> and changes daily. This recipe was tested on commits `5716c39` and `fc50f2f` (see [Limits](#limits)).
+> and changes daily. This example names the commits it was tested on.
 
 ## What agents get
 
-| | How | In the sandbox |
-|---|---|---|
-| **LucidLink MCP tools** | `lucidlink-mcp` runs inside the sandbox as a stdio MCP server | Tools to list, read, write, lock and audit files (or the read-only subset) |
-| **LucidLink folders** | The host mounts filespace folders; Docker volumes bind them into sandboxes | Ordinary directories: the agent's workspace, a shared team skills folder |
+* **Team skills.** One read-only folder of skills, shared by every agent and edited by people in the LucidLink apps.
+* **A persistent workspace.** Each agent's working folder lives on the filespace, outlives its sandbox, shows up live
+  for people, and can be restored from snapshots.
+* **Their own identity.** Each agent signs in with its own LucidLink service account. Its grants define what it can
+  touch, and the filespace audit trail names it for every change.
+* **File tools.** `lucidlink-mcp` runs inside the sandbox and gives the agent tools to list, read, write, lock and
+  audit files (or only the read-only tools).
 
 The example deploys two agents:
 
-* **researcher** (OpenClaw): read-only MCP tools, and team skills from a read-only folder at `/sandbox/skills`.
-* **coder** (Claude Code): read-write MCP tools, and its own folder on the filespace as `/sandbox/workspace`.
+| Agent | Harness | Model | LucidLink |
+|---|---|---|---|
+| `researcher` | OpenClaw | NVIDIA Nemotron, through the NVIDIA API | Read-only tools; team skills at `/sandbox/skills` |
+| `coder` | Claude Code | Anthropic Claude | Read and write tools; its own folder at `/sandbox/workspace` |
 
-Each agent has its own LucidLink service account, so the filespace audit trail names the agent for every change,
-and its grants are exactly what it may touch. Files outlive sandboxes, show up live in the LucidLink apps, and can
-be restored from snapshots.
+[`showcase/`](showcase) adds two agents that edit one shared file at the same time under LucidLink locks.
 
-## What's in this folder
+## Requirements
 
-| Path | What |
-|---|---|
-| `yaml/` | `lucidlink-agents.yaml.tmpl` (the NemoClaw config), `prepare.sh` (builds the toolchain, creates and labels the volumes, renders the YAML), `lucidlink.env.example` |
-| `examples/two-agents/` | The same two agents in OpenTofu, using `modules/lucidlink/`; `pin-providers.sh` pins your bundle's provider versions |
-| `modules/lucidlink/` | OpenTofu module: Docker volumes (toolchain, credentials, folders) plus the mounts, egress policies and MCP server block for `openshell_sandbox` and `fabric_agent` |
-| `host/` | `install-host.sh` (agent user, mounts, MCP tokens), `lucid-agent@.service` (one LucidLink daemon per mount), `agents-apply@.service` and `agents-apply.sh` (re-apply at boot) |
-| `toolchain/Dockerfile` | Self-contained Python and `lucidlink-mcp` under `/opt/lucidlink`, copied into a volume that sandboxes mount read-only |
-| `showcase/` | Two agents editing one shared file at the same time under LucidLink locks |
+* A Linux x86_64 host with Docker. The LucidLink Linux client is published for x86_64 only.
+* The NemoClaw v1 bundle and the `nc-fabric` OpenClaw and Claude images, built from source. See
+  [Get NemoClaw v1](docs/nemoclaw-v1.md).
+* The LucidLink Linux client and `fuse3` (installed in step 1), plus `jq` and `gettext-base` (for `envsubst`).
+* A LucidLink filespace and three service accounts, created in the LucidLink web app:
 
-## How it works
-
-```
-host (Linux)                                              sandbox "coder" (uid 10001)
-────────────────────────────────────────────────────      ─────────────────────────────────────────────
-lucid-agent@2 (coder's account)   /srv/lucid-agent-coder ──▶ /sandbox/workspace          its own folder
-lucid-agent@1 (team read-only)    /srv/lucid-ro-skills   ──▶ /sandbox/skills  (researcher, read-only)
-/etc/lucid-agent/mcp-coder/token                          ──▶ /etc/lucidlink   read-only  its MCP token
-toolchain volume                                          ──▶ /opt/lucidlink   read-only  lucidlink-mcp
-                                                           egress: the LucidLink hub (TCP 443) and the
-                                                           filespace's own bucket, from that Python only
-```
-
-* **Ownership.** A LucidLink FUSE mount shows every file as owned by the user running the daemon. The daemons run as
-  `llagent`, with the sandbox uid (10001), so agents create and edit files with normal permissions. Each mount
-  exposes one folder (`--root-point`).
-* **Read-only.** A folder mounted with a read-only service account is read-only in LucidLink itself: every write
-  gets `Read-only file system`, whatever Docker's `read_only` says.
-* **Tokens.** Daemon tokens are root-only files passed on stdin. An MCP token is a read-only file in the sandbox.
-  The agent runs as the same user as its MCP server, so it could read that token and use it directly: the egress
-  policy keeps other programs away from LucidLink, but **the service account's grants are the real boundary**.
-  `read_only` (`LUCIDLINK_MCP_READ_ONLY=1`) only hides write tools, so give read-only agents a read-only account.
-  Tested: an agent that starts its own MCP server and calls `write_file` with a read-only token gets
-  `permission denied: Authorization exception`.
-* **Volumes.** OpenShell admits a named volume only with the labels `openshell.ai/sandbox-attachable=true` and
-  `openshell.ai/sandbox-attachable-workspace=<workspace>`, and bind-backed volumes need `enable_bind_mounts` and
-  `allow_driver_config` in the gateway's Docker driver. Docker volumes can't be changed, so each name includes a
-  hash of its source: changing a folder creates a new volume and replaces only the sandboxes that use it.
-
-## Quick start
-
-### 1. Prerequisites
-
-* A Linux x86_64 host with Docker, the NemoClaw v1 bundle and its `nc-fabric` images, pinned by digest.
-* The [LucidLink Linux client](https://www.lucidlink.com/download) and `fuse3`.
-* An Anthropic API key (any provider NemoClaw supports works; the example uses Anthropic).
-* Three service accounts, minted in the LucidLink web app or with the LucidLink MCP admin tools:
-
-  | Token | Grant | Used by |
+  | Token file | Grant | Used by |
   |---|---|---|
-  | `team-ro.token` | read on `/agents/team-skills` | the skills mount |
-  | `researcher.token` | read on `/agents/team-skills` (and whatever else it may read) | the researcher's MCP tools |
-  | `coder.token` | read and write on `/agents/coder` | the coder's mount and MCP tools |
+  | `team-ro.token` | Read on `/agents/team-skills` | The skills mount |
+  | `researcher.token` | Read on `/agents/team-skills` | The researcher's MCP tools |
+  | `coder.token` | Read and write on `/agents/coder` | The coder's mount and MCP tools |
 
-### 2. Host
+* An NVIDIA API key from [build.nvidia.com](https://build.nvidia.com) and an Anthropic API key.
 
-Tokens are only ever read on stdin. Re-running a command with the same settings changes nothing.
+## Credentials and secrets
 
-```sh
+* Service account tokens are read only from standard input. `install-host.sh` stores the daemon tokens as root-only
+  files and the MCP tokens as read-only files for the sandbox user.
+* Model API keys stay in the environment of `nemoclaw apply` or `tofu apply`. NemoClaw and OpenShell pass them to the
+  model endpoint. They aren't written to the configuration or the state.
+* An agent can read its own MCP token. The service account's grants are the security boundary, so give the
+  researcher a read-only account. See [How it works](docs/how-it-works.md#identity-and-the-security-boundary).
+
+## Setup
+
+### 1. Prepare the host
+
+Install the LucidLink client and FUSE:
+
+```bash
+curl -fsSLo /tmp/lucidlink.deb https://www.lucidlink.com/download/new-ll-latest/linux-deb/stable/
+sudo apt-get install -y /tmp/lucidlink.deb fuse3
+```
+
+Then run these commands from this folder. Re-running a command with the same settings changes nothing.
+
+```bash
 sudo host/install-host.sh base
-sudo host/install-host.sh mount 1 myfs.myworkspace /agents/team-skills /srv/lucid-ro-skills < team-ro.token
-sudo host/install-host.sh mount 2 myfs.myworkspace /agents/coder /srv/lucid-agent-coder < coder.token
+sudo host/install-host.sh mount 1 <filespace>.<workspace> /agents/team-skills /srv/lucid-ro-skills < team-ro.token
+sudo host/install-host.sh mount 2 <filespace>.<workspace> /agents/coder /srv/lucid-agent-coder < coder.token
 sudo host/install-host.sh mcp-token researcher < researcher.token
 sudo host/install-host.sh mcp-token coder < coder.token
 ```
 
-### 3. Agents, with YAML
+Each `mount` prints `mount ok: <path> (10001:10001)`.
 
-This creates its own managed OpenShell gateway.
+### 2. Deploy the agents with YAML
 
-```sh
+This path creates its own managed OpenShell gateway.
+
+```bash
 cd yaml
-cp lucidlink.env.example lucidlink.env      # filespace, folders, credential directories, image digests
-./prepare.sh                                # volumes and lucidlink-agents.yaml; no secrets involved
-ANTHROPIC_API_KEY=... nemoclaw apply --state-dir .nemoclaw lucidlink-agents.yaml
+cp lucidlink.env.example lucidlink.env    # set the filespace, folders and image digests
+./prepare.sh
+NVIDIA_API_KEY=<nvidia-api-key> ANTHROPIC_API_KEY=<anthropic-api-key> \
+  nemoclaw apply --state-dir .nemoclaw lucidlink-agents.yaml
 ```
 
-Keep `.nemoclaw`: it is the deployment's state. `prepare.sh` gives the deployment a stable `metadata.uid` on its
-first run, because the OpenShell workspace name derives from it and the volumes are labelled for that workspace.
-NemoClaw's YAML has no anchors or variables, which is why a template is rendered and the network grants repeat for
-each sandbox. After changing a folder or credential, run `prepare.sh` and `nemoclaw apply` again; `prepare.sh`
-lists the volumes that are no longer used.
+`prepare.sh` builds the toolchain image, creates and labels the volumes, and renders `lucidlink-agents.yaml`. Keep
+the `.nemoclaw` directory: it holds the deployment's state.
 
-### 3. Or agents, with OpenTofu
+### 2. Or deploy the agents with OpenTofu
 
-This uses an existing OpenShell gateway, for example a NemoClaw deployment's managed gateway, with the Docker
-driver settings above. The agents get their own workspace on it.
+This path uses an existing OpenShell gateway, such as the managed gateway of a NemoClaw deployment, whose Docker
+driver allows bind-backed volumes ([details](docs/how-it-works.md#folders)).
 
-```sh
+```bash
 cd examples/two-agents
-cp terraform.tfvars.example terraform.tfvars          # gateway, images, filespace, credentials, folders
-./pin-providers.sh /path/to/bundle                    # NVIDIA's providers are pre-releases: pin them exactly
-export TF_CLI_CONFIG_FILE=/path/to/providers.tfrc     # filesystem_mirror { path = "/path/to/bundle/providers" }
-export ANTHROPIC_API_KEY=...
+cp terraform.tfvars.example terraform.tfvars          # set the gateway, images, filespace and folders
+./pin-providers.sh /path/to/bundle
+export TF_CLI_CONFIG_FILE=/path/to/providers.tfrc     # a filesystem_mirror for /path/to/bundle/providers
+export NVIDIA_API_KEY=<nvidia-api-key> ANTHROPIC_API_KEY=<anthropic-api-key>
 tofu init && tofu apply
 ```
 
-### 4. Talk to an agent
+## Sandbox, network and policy permissions
 
-`nemoclaw apply` prints the invoke command for each agent; with OpenTofu, `tofu output agents` lists the runtime
-IDs. For example:
+| Sandbox | Mounts | Network grants (besides the model endpoint) |
+|---|---|---|
+| `researcher` | `/sandbox/skills` read-only, `/opt/lucidlink` and `/etc/lucidlink` read-only | LucidLink hub and the filespace's bucket, for the toolchain's Python only |
+| `coder` | `/sandbox/workspace` read-write, `/opt/lucidlink` and `/etc/lucidlink` read-only | The same |
 
-```sh
-export OPENSHELL_GATEWAY_ENDPOINT=http://127.0.0.1:17671 OPENSHELL_WORKSPACE=<workspace>
-printf '"List /agents/team-skills with your LucidLink tools."' | \
-  openshell sandbox exec -n researcher --no-tty -- fabric-agent-ctl invoke --agent main --runtime-id <id> --input -
+Both sandboxes use the `isolated` network tier. The gateway must set `allow_driver_config` and `enable_bind_mounts`
+in its Docker driver configuration; the YAML path sets them.
+
+## Verification
+
+`scripts/verify.sh` checks both sandboxes from the host, without a model:
+
+* The researcher sees the team skills, and both the folder and its service account refuse writes.
+* A file that the coder writes in `/sandbox/workspace` is on the filespace in its folder.
+* Programs other than the MCP server can't reach LucidLink.
+
+`nemoclaw apply` prints the workspace and each agent's runtime ID; with OpenTofu, run `tofu output agents`. Set
+`RESEARCHER_RUNTIME` to also ask the researcher, through its model, to list the skills folder with its tools.
+
+```bash
+OPENSHELL_GATEWAY_ENDPOINT=http://127.0.0.1:17671 OPENSHELL_WORKSPACE=<workspace> \
+FILESPACE=<filespace> SKILLS_PATH=/agents/team-skills CODER_PATH=/agents/coder \
+RESEARCHER_RUNTIME=<runtime-id> scripts/verify.sh
 ```
 
-## Showcase: agents sharing one workspace
+Every line starts with `ok` when the deployment works. The script exits with status 1 if a check fails.
 
-[`showcase/`](./showcase) runs two agents with different harnesses and their own accounts that append to one file
-at the same time, taking a LucidLink lock for each change. No entry is lost, and the audit trail shows who wrote
-what. That is what a filespace adds over a plain volume: shared state across sandboxes, hosts and people,
-coordination through locks, and attribution.
+To talk to an agent, use the invoke command that `nemoclaw apply` prints for it.
 
-## Operations
+## Startup and shutdown
 
-* **Reboots.** The `lucid-agent@` mounts start before Docker, and the gateway restarts the sandboxes, but agent
-  runtimes don't survive a reboot (`nemoclaw plan` shows "agent runtime is not running"). `agents-apply@<name>`
-  (install steps in the unit file; one instance per deployment, YAML or OpenTofu) re-applies at boot. It applies
-  in-place changes only: a plan that would delete or replace something is re-checked for a few minutes and then
-  left for a person to review. Instances run one at a time, so several deployments don't starve a small host.
-* **Changes.** Anything fixed when a sandbox starts (instructions, model, mounts, policies, MCP server) replaces
-  that agent's sandbox. Its files on LucidLink stay.
-* **Never stop or unmount a LucidLink mount under running sandboxes.** The daemon stops responding. Stop the
-  sandbox containers that use the mount first, restart `lucid-agent@<n>`, then apply again.
-* **Tag images by commit.** NemoClaw's image build always tags `nc-fabric:<harness>`. Building another commit moves
-  the tag, and digest references to the old image stop resolving. After each build, run
-  `docker tag nc-fabric:<harness> nc-fabric:<harness>-<commit>`.
-* **Restore.** Service accounts can't create snapshots, but they can mount the filespace's scheduled snapshots
-  read-only (`lucid link --snapshot <id>` in a spare instance) to copy files back.
-* **Teardown.** YAML: `nemoclaw destroy --state-dir .nemoclaw`, then remove the volumes `prepare.sh` made
-  (`docker volume ls --filter label=lucidlink.com/recipe=nemoclaw-v1-yaml`). OpenTofu:
-  `tofu destroy -var destroy=true`. On the host: `systemctl disable --now agents-apply@<name> lucid-agent@<n>` and
-  remove what you no longer need from `/etc/lucid-agent`. Files on LucidLink stay.
+After a reboot, the LucidLink mounts start before Docker and the gateway restarts the sandboxes, but agent runtimes
+must be applied again. `host/agents-apply@.service` does this at boot. See [Operations](docs/operations.md).
 
-## Limits
+## Cleanup
+
+* YAML: `nemoclaw destroy --state-dir .nemoclaw`, then
+  `docker volume ls -q --filter label=lucidlink.com/recipe=nemoclaw-v1-yaml | xargs -r docker volume rm`.
+* OpenTofu: `tofu destroy -var destroy=true`.
+* Host: `sudo systemctl disable --now lucid-agent@1 lucid-agent@2`, then remove `/etc/lucid-agent`.
+
+Files on the filespace stay. Delete the service accounts in the LucidLink web app when you no longer need them.
+
+## Known limitations
 
 * **Linux x86_64 only.** The LucidLink Linux client and the Python SDK behind `lucidlink-mcp` are published for
-  x86_64 only today, so this recipe doesn't run on arm64 hosts such as DGX Spark or DGX Station yet.
-* **Tested commits.** `5716c39` (OpenShell 0.1.7, OpenTofu 1.12): everything, including the showcase.
-  `fc50f2f` (OpenShell 0.1.8, OpenTofu 1.13): both forms deploy and the coder works, but at that commit OpenClaw
-  can't call an Anthropic provider (with or without LucidLink), so the researcher's LucidLink tools were checked
-  without the model.
-* **Tool allowlists.** Fabric's per-tool MCP filters (`allowed_tools`) aren't available for OpenClaw or Claude Code
-  yet. Use `read_only` for the tool list and a narrowly granted service account for enforcement.
-* **Hermes** isn't in the example: at the tested commits, NemoClaw's Hermes image couldn't use an Anthropic provider.
-* **Instructions.** OpenClaw only supports replacing its system prompt, so the example replaces it for OpenClaw
-  and appends for Claude Code.
-* **Storage.** The egress policy assumes path-style S3 URLs (`<host>/<bucket>/…`, bucket `lucid-fs-<filespace id>`),
-  as the client uses with AWS S3. Other object stores need their own endpoints.
-* **Toolchain.** The image pins its base by digest and `lucidlink-mcp` by version, not its dependencies. For strict
-  reproducibility, build it once, push it, and use it by digest.
+  x86_64 only. This example doesn't run on arm64 hosts such as DGX Spark yet.
+* **Preview commits.** Tested on NemoClaw v1 commit `ce910d0`. The YAML uses `spec.grants` and `agent.mcp`, which
+  need commit `9aff1c4` or later. The OpenTofu example also ran on `5716c39` and `fc50f2f`.
+* **Claude Code needs an Anthropic Messages endpoint.** NVIDIA's API doesn't serve Nemotron models on that API, so
+  the coder uses Anthropic.
+* **Tool allowlists.** Fabric's per-tool MCP filters aren't available for OpenClaw or Claude Code. `read_only` trims
+  the tool list; the service account's grants enforce it.
+* **Object storage.** The storage grant assumes path-style S3 URLs (`<host>/<bucket>/…`), as the LucidLink client
+  uses with AWS S3. Other object stores need their own endpoints.
+
+## Files
+
+| Path | Contents |
+|---|---|
+| `yaml/` | The NemoClaw configuration template, `prepare.sh` and `lucidlink.env.example` |
+| `examples/two-agents/` | The same agents in OpenTofu, using `modules/lucidlink/` |
+| `modules/lucidlink/` | OpenTofu module: volumes, mounts, network grants and the MCP server block |
+| `host/` | `install-host.sh`, the `lucid-agent@` mount unit and the `agents-apply@` boot unit |
+| `toolchain/` | The Dockerfile for the in-sandbox Python and `lucidlink-mcp` |
+| `scripts/verify.sh` | The verification script |
+| `showcase/` | Two agents sharing one file under LucidLink locks |
+| `docs/` | [How it works](docs/how-it-works.md), [Operations](docs/operations.md), [Get NemoClaw v1](docs/nemoclaw-v1.md) |

@@ -66,21 +66,8 @@ nemoclaw <sb> exec -- openclaw agent --agent main -m "Use the lucidlink tools: c
 ## NemoClaw v1 (preview)
 
 NemoClaw v1, the unreleased `v1` branch, is declarative: a YAML config for `nemoclaw apply`, or OpenTofu providers
-for OpenShell sandboxes and NeMo Fabric agents. `mcp add` is gone. Instead, [`nemoclaw-v1/`](./nemoclaw-v1) is a
-recipe in both forms that gives agents in stock `nc-fabric` images the LucidLink MCP tools and LucidLink folders: a
-workspace that outlives the sandbox and a read-only team skills folder, with one service account per agent.
-
-```bash
-# 1. Host: LucidLink mounts as the sandbox's user, started before Docker; tokens only on stdin
-sudo nemoclaw-v1/host/install-host.sh base
-sudo nemoclaw-v1/host/install-host.sh mount 1 <filespace>.<workspace> /agents/team-skills /srv/lucid-ro-skills < team-ro.token
-sudo nemoclaw-v1/host/install-host.sh mount 2 <filespace>.<workspace> /agents/coder /srv/lucid-agent-coder < coder.token
-sudo nemoclaw-v1/host/install-host.sh mcp-token researcher < researcher.token
-sudo nemoclaw-v1/host/install-host.sh mcp-token coder < coder.token
-
-# 2. Agents: an OpenClaw researcher (read-only) and a Claude Code coder (its own folder as workspace)
-cd nemoclaw-v1/yaml && cp lucidlink.env.example lucidlink.env    # then fill it in
-./prepare.sh && ANTHROPIC_API_KEY=... nemoclaw apply --state-dir .nemoclaw lucidlink-agents.yaml
-```
-
-To use OpenTofu instead, and for the details, see [`nemoclaw-v1/README.md`](./nemoclaw-v1).
+for OpenShell sandboxes and NeMo Fabric agents. `mcp add` is gone. [`nemoclaw-v1/`](./nemoclaw-v1) gives agents in
+stock `nc-fabric` images a LucidLink filespace in both forms: a read-only team skills folder, a workspace that
+outlives the sandbox, and the LucidLink MCP tools, with one service account per agent. The example runs an OpenClaw
+researcher on NVIDIA Nemotron and a Claude Code coder on Claude. Setup, verification and limits are in
+[`nemoclaw-v1/README.md`](./nemoclaw-v1).

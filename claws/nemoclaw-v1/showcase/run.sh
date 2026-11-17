@@ -23,7 +23,7 @@ invoke() {  # sandbox prompt -> the agent's reply
 }
 tool() {  # sandbox tool json-args -> the tool's text output (no LLM)
   "$OPENSHELL" sandbox exec -n "$1" --no-tty -- env LUCIDLINK_FILESPACE="$FILESPACE" \
-    /opt/lucidlink/venv/bin/python - "$2" "$3" < "$HERE/mcp-call.py"
+    /opt/lucidlink/venv/bin/python - "$2" "$3" < "$HERE/../scripts/mcp-call.py"
 }
 task() {
   echo "Append $N entries to $BOARD, one entry at a time. For each entry: claim_file on $BOARD with blocking=true;" \

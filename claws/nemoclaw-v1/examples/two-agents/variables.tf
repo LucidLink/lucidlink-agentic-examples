@@ -23,13 +23,25 @@ variable "images" {
   })
 }
 
-variable "model" {
-  description = "Anthropic model and the host environment variable holding its key (read by the provider at apply; never stored)."
-  type = object({
-    name           = string
-    credential_env = optional(string, "ANTHROPIC_API_KEY")
-  })
-  default = { name = "claude-sonnet-4-6" }
+variable "inference" {
+  description = <<-EOT
+    Model endpoints by name. api: anthropic-messages or openai-completions. credential_env names the host environment
+    variable that holds the API key; the provider reads it at apply and doesn't store it.
+  EOT
+  type = map(object({
+    api            = string
+    endpoint       = string
+    credential_env = string
+  }))
+  default = {
+    nvidia    = { api = "openai-completions", endpoint = "https://integrate.api.nvidia.com/v1", credential_env = "NVIDIA_API_KEY" }
+    anthropic = { api = "anthropic-messages", endpoint = "https://api.anthropic.com", credential_env = "ANTHROPIC_API_KEY" }
+  }
+
+  validation {
+    condition     = alltrue([for i in values(var.inference) : contains(["anthropic-messages", "openai-completions"], i.api) && startswith(i.endpoint, "https://")])
+    error_message = "api must be anthropic-messages or openai-completions, and endpoint an https:// URL."
+  }
 }
 
 variable "lucidlink_mcp_version" {
@@ -65,6 +77,7 @@ variable "agents" {
   description = <<-EOT
     Agents by sandbox name.
     harness:      openclaw | claude
+    model:        { inference = <inference key>, name = <model id> }; Claude Code needs an anthropic-messages endpoint
     mcp:          null, or { credential = <lucidlink_credentials key>, read_only = bool }
     skills:       null, or a lucidlink_folders key mounted read-only at /sandbox/skills
     workspace:    null, or a lucidlink_folders key mounted at /sandbox/workspace
@@ -73,6 +86,7 @@ variable "agents" {
   EOT
   type = map(object({
     harness      = string
+    model        = object({ inference = string, name = string })
     mcp          = optional(object({ credential = string, read_only = optional(bool, false) }))
     skills       = optional(string)
     workspace    = optional(string)
@@ -82,6 +96,17 @@ variable "agents" {
   validation {
     condition     = alltrue([for a in values(var.agents) : contains(["openclaw", "claude"], a.harness)])
     error_message = "harness must be openclaw or claude."
+  }
+
+  validation {
+    condition     = alltrue([for a in values(var.agents) : contains(keys(var.inference), a.model.inference)])
+    error_message = "Each agent's model.inference must be a key of var.inference."
+  }
+
+  validation {
+    condition = alltrue([for a in values(var.agents) :
+    a.harness != "claude" || try(var.inference[a.model.inference].api, "") == "anthropic-messages"])
+    error_message = "Claude Code needs an anthropic-messages endpoint."
   }
 }
 

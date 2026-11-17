@@ -10,7 +10,7 @@
 #   MODE=tofu      WORKDIR=<OpenTofu example dir>  TOFU=<tofu binary>  TF_CLI_CONFIG_FILE=...
 #                  (+ TF_WORKSPACE=<workspace> and TF_CLI_ARGS_plan=-var-file=<file> for a non-default workspace)
 #   MODE=nemoclaw  WORKDIR=<dir>  NEMOCLAW=<nemoclaw binary>  NEMOCLAW_CONFIG=<yaml>  NEMOCLAW_STATE_DIR=<dir>
-#   plus the model key, e.g. ANTHROPIC_API_KEY.
+#   plus the model API keys: NVIDIA_API_KEY and ANTHROPIC_API_KEY.
 #   RISKY_RETRIES (default 6) and RISKY_WAIT (seconds, default 30) bound the re-checks.
 set -euo pipefail
 cd "${WORKDIR:?set WORKDIR}"

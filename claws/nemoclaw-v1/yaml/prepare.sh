@@ -2,7 +2,7 @@
 # Prepare the LucidLink volumes for a NemoClaw v1 deployment and render its YAML.
 #
 #   ./prepare.sh [lucidlink.env]
-#   nemoclaw apply --state-dir .nemoclaw lucidlink-agents.yaml
+#   NVIDIA_API_KEY=... ANTHROPIC_API_KEY=... nemoclaw apply --state-dir .nemoclaw lucidlink-agents.yaml
 #
 # Run as a user that can use Docker, after host/install-host.sh. Safe to re-run: it builds the toolchain image if
 # missing, fills the toolchain volume once and creates each volume once. Volume names include a hash of their
@@ -25,18 +25,21 @@ fi
 
 set -a; . "$ENV_FILE"; set +a
 for v in NEMOCLAW_UID DEPLOYMENT_NAME GATEWAY_PORT GATEWAY_CIDR FILESPACE_NAME FILESPACE_ID STORAGE_HOST \
-         RESEARCHER_CRED_DIR CODER_CRED_DIR SKILLS_DIR CODER_DIR OPENCLAW_IMAGE CLAUDE_IMAGE MODEL LUCIDLINK_MCP_VERSION; do
+         RESEARCHER_CRED_DIR CODER_CRED_DIR SKILLS_DIR CODER_DIR OPENCLAW_IMAGE CLAUDE_IMAGE \
+         RESEARCHER_PROVIDER RESEARCHER_MODEL CODER_MODEL LUCIDLINK_MCP_VERSION; do
   [ -n "${!v:-}" ] || { echo "$v is not set in $ENV_FILE" >&2; exit 2; }
 done
 BUCKET=${BUCKET:-lucid-fs-$FILESPACE_ID}
 INTERPRETER=${INTERPRETER:-/opt/lucidlink/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12}
 # Values go into YAML unescaped, so allow only plain characters (and catch unfilled placeholders).
 for v in NEMOCLAW_UID DEPLOYMENT_NAME GATEWAY_PORT GATEWAY_CIDR FILESPACE_NAME FILESPACE_ID STORAGE_HOST BUCKET \
-         OPENCLAW_IMAGE CLAUDE_IMAGE MODEL INTERPRETER; do
+         OPENCLAW_IMAGE CLAUDE_IMAGE RESEARCHER_MODEL CODER_MODEL INTERPRETER; do
   [[ ${!v} =~ ^[A-Za-z0-9._:/@+-]+$ ]] || { echo "$v has unexpected characters: '${!v}'" >&2; exit 2; }
 done
 [[ $FILESPACE_ID =~ ^[0-9a-f-]{36}$ && $FILESPACE_ID != 00000000-0000-0000-0000-000000000000 ]] \
   || { echo "set FILESPACE_ID (lucid status: Filespace id)" >&2; exit 2; }
+[[ $RESEARCHER_PROVIDER == nvidia || $RESEARCHER_PROVIDER == anthropic ]] \
+  || { echo "RESEARCHER_PROVIDER must be nvidia or anthropic" >&2; exit 2; }
 [[ $OPENCLAW_IMAGE == *@sha256:* && $CLAUDE_IMAGE == *@sha256:* ]] || { echo "pin OPENCLAW_IMAGE/CLAUDE_IMAGE by digest" >&2; exit 2; }
 WORKSPACE=nc-$(printf '%s' "$NEMOCLAW_UID" | sha256sum | cut -c1-16)
 # Volume names carry part of the workspace hash, so two deployments (or the OpenTofu flavour) never share one.
@@ -87,7 +90,8 @@ CODER_VOL=$(bind_volume "$PREFIX-dir-coder-$(short "$CODER_DIR")" "$CODER_DIR")
 # -- render
 export WORKSPACE BUCKET INTERPRETER TOOLCHAIN_VOL RESEARCHER_CRED_VOL CODER_CRED_VOL SKILLS_VOL CODER_VOL
 VARS='$WORKSPACE $DEPLOYMENT_NAME $NEMOCLAW_UID $GATEWAY_PORT $GATEWAY_CIDR $FILESPACE_NAME $FILESPACE_ID
-      $STORAGE_HOST $BUCKET $INTERPRETER $OPENCLAW_IMAGE $CLAUDE_IMAGE $MODEL
+      $STORAGE_HOST $BUCKET $INTERPRETER $OPENCLAW_IMAGE $CLAUDE_IMAGE
+      $RESEARCHER_PROVIDER $RESEARCHER_MODEL $CODER_MODEL
       $TOOLCHAIN_VOL $RESEARCHER_CRED_VOL $CODER_CRED_VOL $SKILLS_VOL $CODER_VOL'
 envsubst "$VARS" < "$HERE/lucidlink-agents.yaml.tmpl" > "$OUT"
 
@@ -97,4 +101,5 @@ stale=$(docker volume ls -q --filter label=lucidlink.com/recipe=nemoclaw-v1-yaml
           --filter "label=openshell.ai/sandbox-attachable-workspace=$WORKSPACE" | while read -r v; do
           [[ $used == *" $v "* ]] || echo "$v"; done)
 [ -z "$stale" ] || printf 'no longer used (remove after the next apply): docker volume rm %s\n' "$(echo $stale)"
-echo "next: ANTHROPIC_API_KEY=... nemoclaw apply --state-dir $HERE/.nemoclaw $OUT   (keep that state directory)"
+keys=ANTHROPIC_API_KEY; [ "$RESEARCHER_PROVIDER" = nvidia ] && keys="NVIDIA_API_KEY=... $keys"
+echo "next: $keys=... nemoclaw apply --state-dir $HERE/.nemoclaw $OUT   (keep that state directory)"

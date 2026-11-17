@@ -15,7 +15,7 @@ sudo ../host/install-host.sh mcp-token writer-b < writer-b.token
 
 cd ../examples/two-agents
 ./pin-providers.sh /path/to/bundle
-export TF_CLI_CONFIG_FILE=/path/to/providers.tfrc ANTHROPIC_API_KEY=...
+export TF_CLI_CONFIG_FILE=/path/to/providers.tfrc NVIDIA_API_KEY=<nvidia-api-key> ANTHROPIC_API_KEY=<anthropic-api-key>
 tofu init && tofu workspace new showcase
 cp ../../showcase/showcase.tfvars.example ../../showcase/showcase.tfvars   # fill in
 tofu apply -var-file=../../showcase/showcase.tfvars
@@ -24,7 +24,7 @@ OPENSHELL_GATEWAY_ENDPOINT=http://127.0.0.1:17671 FILESPACE=my-filespace BOARD=/
   ../../showcase/run.sh
 ```
 
-`run.sh` resets the board and counts the result without an LLM: `mcp-call.py` calls the MCP tools directly from
+`run.sh` resets the board and counts the result without an LLM: `../scripts/mcp-call.py` calls the MCP tools directly from
 inside a writer's sandbox. For a boot-time `agents-apply@showcase` instance, add `TF_WORKSPACE=showcase` and
 `TF_CLI_ARGS_plan=-var-file=<path to showcase.tfvars>` to its env file.
 
